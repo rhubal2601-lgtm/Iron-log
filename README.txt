@@ -1,15 +1,18 @@
-IRON LOG – iOS PWA-Prototyp
+IRON LOG — BLACK & BLUE
 
-Enthalten: index.html, manifest.webmanifest, sw.js
+Dateien im Hauptordner:
+- index.html
+- manifest.webmanifest
+- sw.js
 
-Funktionen:
-- Tageslog: Gewicht, Bauchumfang, Kalorien, Makros, Schritte, Schlaf, Training, Schicht und Notizen
-- Training: Torso A, Limbs A, Torso B, Limbs B mit Satz-/Wiederholungsfeldern
-- Analyse: 7-Tage-Gewichtsmittel, Vorwochenvergleich, Kalorienmittel und Trenddiagramm
-- Lokale Speicherung, JSON-Backup exportieren/importieren
-- Einstellbare Kalorien- und Makroziele
+GitHub Pages (iPhone):
+1. Öffne das iron-log Repository auf github.com.
+2. Add file > Upload files.
+3. Lade diese drei Dateien direkt in den Repository-Hauptordner hoch (nicht in einen zusätzlichen Unterordner).
+4. Commit changes.
+5. Settings > Pages > Build and deployment.
+6. Source: Deploy from a branch; Branch: main; Folder: /(root); Save.
+7. Warte kurz und öffne https://DEIN-NAME.github.io/iron-log/ in Safari.
+8. Teilen > Zum Home-Bildschirm.
 
-Installation auf dem iPhone:
-Für PWA-Installation und Offline-Caching muss die App über HTTPS gehostet werden. Dann in Safari öffnen → Teilen → Zum Home-Bildschirm. Diese ZIP ist ein Web-App-Prototyp, keine native App-Store-App.
-
-Datenschutz: Keine Konten/Cloud in dieser Version. Einträge bleiben im localStorage dieses Browsers auf diesem Gerät. Regelmäßig Backup exportieren. Beim Löschen der Website-Daten können Einträge verloren gehen.
+Hinweis: Trainings- und Ernährungsdaten werden lokal im Browser dieses Geräts gespeichert. Exportiere regelmäßig ein Backup über Fortschritt > Daten sichern. Mehrere Profile sind für die Nutzung auf demselben Gerät vorgesehen; die Daten werden nicht automatisch zwischen Geräten synchronisiert.
