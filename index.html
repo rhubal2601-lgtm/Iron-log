@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#090909"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="manifest" href="manifest.webmanifest">
+<title>logbook</title>
+<style>
+:root{--bg:#090909;--panel:#171717;--panel2:#202020;--text:#f5f5f5;--muted:#a3a3a3;--accent:#f2d000;--line:#393300;--radius:16px}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,-apple-system,sans-serif;padding-bottom:90px}
+header{position:sticky;top:0;background:#090909ed;backdrop-filter:blur(12px);z-index:3;border-bottom:1px solid var(--line);padding:15px max(16px,env(safe-area-inset-left))}
+.brand{font-size:27px;font-weight:900;letter-spacing:-1.5px}.brand span{color:var(--accent)}.topline{display:flex;align-items:center;justify-content:space-between;gap:12px}
+main{max-width:760px;margin:auto;padding:18px 14px}.tabs{position:fixed;bottom:0;left:0;right:0;background:#111;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 4px calc(8px + env(safe-area-inset-bottom));z-index:5}
+.tabs button{background:none;border:0;color:var(--muted);font-size:11px;padding:7px 4px;min-width:52px}.tabs button.active{color:var(--accent)}.tabs b{display:block;font-size:19px;margin-bottom:2px}
+.card{background:var(--panel);border:1px solid #2b2b2b;border-radius:var(--radius);padding:15px;margin:12px 0}
+h1{font-size:25px;margin:5px 0 14px}h2{font-size:18px;margin:4px 0 12px}h3{font-size:15px;margin:0 0 8px}
+p,.muted{color:var(--muted);line-height:1.45}.row{display:flex;gap:10px;align-items:center}.between{justify-content:space-between}.grow{flex:1;min-width:0}
+button,.btn{border:1px solid #5b5000;background:var(--accent);color:#111;border-radius:12px;padding:11px 14px;font-weight:750;cursor:pointer}
+button.secondary{background:#252525;color:var(--text);border-color:#444}button.ghost{background:transparent;color:var(--accent);border-color:var(--line)}button.danger{background:#391b1b;color:#ffb4b4;border-color:#663333}
+input,select,textarea{width:100%;background:#101010;border:1px solid #414141;color:var(--text);border-radius:10px;padding:12px;font:inherit;margin:5px 0 12px}
+label{display:block;color:#ccc;font-size:13px;margin-top:8px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stat{background:var(--panel2);border-radius:12px;padding:12px}.stat strong{font-size:21px;display:block;color:var(--accent)}
+.pill{border:1px solid var(--line);border-radius:99px;padding:5px 9px;color:var(--accent);font-size:12px}
+.exercise{padding:12px 0;border-top:1px solid #333}.exercise:first-child{border-top:0}
+.hidden{display:none!important}.notice{background:#292400;border:1px solid #665900;padding:12px;border-radius:12px;color:#ffe96b;margin:12px 0}
+small{color:var(--muted)}.check{display:flex;align-items:center;gap:8px}.check input{width:auto;margin:0}
+@media(min-width:650px){.tabs{position:static;max-width:760px;margin:auto;border:0;background:transparent;padding:10px}.tabs button{font-size:13px}.tabs b{display:inline;margin-right:6px}body{padding-bottom:20px}}
+</style>
+</head>
+<body>
+<header><div class="topline"><div class="brand">log<span>book</span></div><div id="sessionLabel" class="pill">Nicht angemeldet</div></div></header>
+<main id="app"></main>
+<nav class="tabs" id="tabs">
+<button data-tab="home" class="active"><b>⌂</b>Home</button><button data-tab="training"><b>▣</b>Training</button><button data-tab="profiles"><b>♙</b>Profile</button><button data-tab="editor"><b>✎</b>Editor</button><button data-tab="account"><b>☰</b>Konto</button>
+</nav>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script>
+const $=s=>document.querySelector(s), app=$('#app');
+let sb=null,user=null,workspace=null,profiles=[],activeProfile=null,settings={},tab='home',plan='PPL',busy=false;
+const defaults={accent:'#f2d000',bg:'#090909',panel:'#171717',radius:16,layout:'comfortable',buttonStyle:'filled',titles:{home:'Übersicht',training:'Training',profiles:'Personenprofile',editor:'App gestalten',account:'Konto'},custom:[]};
+const plans={
+PPL:{Push:['Brustpresse Maschine','Schulterdrücken Maschine','Seitheben Maschine','Butterfly','Trizepsdrücken Kabel'],Pull:['Latzug','Rudern sitzend','Reverse Butterfly','Bizepscurls Kabel'],Legs:['Beinpresse','Beinbeuger sitzend','Beinstrecker','Wadenheben','Bauchmaschine']},
+TL:{'Torso A':['Brustpresse Maschine','Latzug','Rudern sitzend','Butterfly','Seitheben','Bizepscurls','Trizepsdrücken'],'Limbs A':['Beinpresse','Beinbeuger sitzend','Beinstrecker','Wadenheben','Bizepsmaschine','Trizepsmaschine'],'Torso B':['Schräg-Brustpresse','Neutraler Latzug','Chest-supported Row','Reverse Butterfly','Seitheben Kabel','Hammercurls','Trizeps über Kopf'],'Limbs B':['Hackenschmidt/Beinpresse','Rumänisches Kreuzheben leicht','Beinbeuger','Wadenheben','Bizepscurls','Trizepsdrücken']}
+};
+function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function applySettings(){let s={...defaults,...settings};document.documentElement.style.setProperty('--accent',s.accent);document.documentElement.style.setProperty('--bg',s.bg);document.documentElement.style.setProperty('--panel',s.panel);document.documentElement.style.setProperty('--radius',(s.radius||16)+'px');document.body.style.background=s.bg}
+function msg(t){return `<div class="notice">${esc(t)}</div>`}
+function field(label,id,value='',type='text'){return `<label>${label}</label><input id="${id}" type="${type}" value="${esc(value)}">`}
+function localConfig(){return window.LOGBOOK_SUPABASE||{}}
+function configReady(){const c=localConfig();return !!(c.url&&c.anonKey&&!c.url.includes('DEINE_')&&!c.anonKey.includes('DEIN_'))}
+async function init(){
+ if(configReady()&&window.supabase){const c=localConfig();sb=window.supabase.createClient(c.url,c.anonKey);const {data:{session}}=await sb.auth.getSession();if(session){user=session.user;await loadWorkspace()}sb.auth.onAuthStateChange(async(_e,s)=>{user=s?.user||null;workspace=null;profiles=[];if(user)await loadWorkspace();render()})}
+ render();
+}
+async function loadWorkspace(){
+ if(!sb||!user)return;
+ let r=await sb.from('workspaces').select('*').eq('owner_id',user.id).maybeSingle();
+ if(!r.data){let ins=await sb.from('workspaces').insert({owner_id:user.id,name:'Mein logbook'}).select().single();if(ins.error){console.error(ins.error);return}workspace=ins.data}else workspace=r.data;
+ const [pr,st]=await Promise.all([sb.from('profiles').select('*').eq('workspace_id',workspace.id).order('created_at'),sb.from('app_settings').select('settings').eq('workspace_id',workspace.id).maybeSingle()]);
+ profiles=pr.data||[];settings=st.data?.settings||{};applySettings();activeProfile=profiles[0]||null;
+}
+async function saveSettings(){if(!sb||!workspace)return;let r=await sb.from('app_settings').upsert({workspace_id:workspace.id,settings},{onConflict:'workspace_id'});if(r.error)alert(r.error.message)}
+async function saveProfile(p){let r=await sb.from('profiles').upsert(p).select().single();if(r.error){alert(r.error.message);return}await loadWorkspace();render()}
+async function render(){
+ applySettings();$('#sessionLabel').textContent=user?(user.email||'Angemeldet'):'Gastmodus';
+ $('#tabs').classList.toggle('hidden',!user);
+ if(!configReady()){app.innerHTML=`<h1>Willkommen bei logbook</h1>${msg('Cloud noch nicht verbunden. Trage zuerst deine Supabase-Projektdaten in supabase-config.js ein. Die Einrichtung ist in SETUP.md erklärt.')}${authForm()}<p>Du kannst das Paket bereits veröffentlichen; die Cloud-Funktionen werden nach der Konfiguration aktiv.</p>`;return}
+ if(!user){app.innerHTML=`<h1>Dein Training. Dein Fortschritt.</h1><div class="card"><h2>Anmelden oder Konto erstellen</h2>${authForm()}</div>`;return}
+ if(!workspace){app.innerHTML=msg('Workspace wird geladen …');return}
+ const title=settings.titles?.[tab]||defaults.titles[tab]||tab;
+ let html=`<div class="row between"><h1>${esc(title)}</h1>${activeProfile?`<span class="pill">${esc(activeProfile.name)}</span>`:''}</div>`;
+ if(tab==='home')html+=homeView();
+ if(tab==='training')html+=trainingView();
+ if(tab==='profiles')html+=profilesView();
+ if(tab==='editor')html+=editorView();
+ if(tab==='account')html+=accountView();
+ app.innerHTML=html;wire();
+}
+function authForm(){return `<form id="auth"><label>E-Mail</label><input id="email" type="email" required placeholder="name@beispiel.at"><label>Passwort</label><input id="password" type="password" required minlength="8" placeholder="Mindestens 8 Zeichen"><div class="row"><button type="submit">Anmelden</button><button type="button" class="secondary" id="signup">Konto erstellen</button></div><p id="authmsg"></p></form>`}
+function homeView(){return `<div class="card"><h2>Heute im Fokus</h2>${activeProfile?`<p>Aktives Profil: <b>${esc(activeProfile.name)}</b></p><div class="grid"><div class="stat"><small>Startgewicht</small><strong>${activeProfile.start_weight??'–'} kg</strong></div><div class="stat"><small>Zielgewicht</small><strong>${activeProfile.goal_weight??'–'} kg</strong></div><div class="stat"><small>Kalorienziel</small><strong>${activeProfile.calories??'–'}</strong></div><div class="stat"><small>Protein</small><strong>${activeProfile.protein??'–'} g</strong></div></div>`:`<p>Erstelle zuerst ein Personenprofil.</p><button data-go="profiles">Profil erstellen</button>`}</div><div class="card"><h2>Schnellzugriff</h2><div class="row"><button data-go="training">Training starten</button><button class="secondary" data-go="profiles">Profile</button></div></div>${(settings.custom||[]).filter(x=>x.place==='home').map(customCard).join('')}`}
+function profilesView(){return `<div class="card"><h2>Neues Personenprofil</h2>${field('Name','pname','','text')}<div class="grid">${field('Startgewicht (kg)','pstart','','number')}${field('Zielgewicht (kg)','pgoal','','number')}${field('Kalorienziel','pkcal','2500','number')}${field('Protein (g)','ppro','190','number')}</div><label>Trainingssystem</label><select id="pplan"><option value="PPL">Push / Pull / Legs</option><option value="TL">Torso / Limbs A/B</option></select><button id="createProfile">Profil erstellen</button></div><div class="card"><h2>Deine Profile</h2>${profiles.length?profiles.map(p=>`<div class="exercise row between"><div class="grow"><b>${esc(p.name)}</b><small> · ${p.plan==='TL'?'Torso/Limbs':'PPL'} · ${p.goal_weight||'–'} kg Ziel</small></div><button class="secondary" data-activate="${p.id}">${activeProfile?.id===p.id?'Aktiv':'Auswählen'}</button></div>`).join(''):'<p>Noch keine Profile angelegt.</p>'}</div>${(settings.custom||[]).filter(x=>x.place==='profiles').map(customCard).join('')}`}
+function trainingView(){if(!activeProfile)return `<div class="card">Bitte zuerst ein Profil erstellen.</div>`;const typ=activeProfile.plan||'PPL',keys=Object.keys(plans[typ]);return `<div class="card"><div class="row between"><h2>${typ==='PPL'?'Push · Pull · Legs':'Torso · Limbs A/B'}</h2><span class="pill">${typ}</span></div><p>Übungen anpassen und Einheit protokollieren.</p><label>Trainingstag</label><select id="day">${keys.map(k=>`<option>${k}</option>`).join('')}</select><div id="exerciseList">${exerciseRows(keys[0])}</div><button id="saveWorkout">Training speichern</button></div>${(settings.custom||[]).filter(x=>x.place==='training').map(customCard).join('')}`}
+function exerciseRows(day){return (plans[activeProfile?.plan||'PPL'][day]||[]).map((e,i)=>`<div class="exercise"><label>Übung ${i+1}</label><input class="exname" value="${esc(e)}"><div class="grid"><div><small>Sätze</small><input class="sets" type="number" value="3" min="1"></div><div><small>Wiederholungen</small><input class="reps" value="8–12"></div><div><small>Gewicht (kg)</small><input class="weight" type="number" min="0" step=".5" placeholder="0"></div><div><small>Erledigt</small><select class="done"><option value="false">Nein</option><option value="true">Ja</option></select></div></div></div>`).join('')+`<button class="ghost" id="addExercise">+ Übung hinzufügen</button>`}
+function customCard(x){return `<div class="card"><h3>${esc(x.title)}</h3><p>${esc(x.body)}</p></div>`}
+function editorView(){let s={...defaults,...settings};return `<div class="card"><h2>Gemeinsames App-Design</h2><p>Diese Gestaltung gilt für alle Profile in deinem Konto.</p>${field('Überschrift Home','t_home',s.titles.home)}${field('Überschrift Training','t_training',s.titles.training)}${field('Überschrift Profile','t_profiles',s.titles.profiles)}${field('Überschrift Editor','t_editor',s.titles.editor)}<label>Akzentfarbe</label><input id="accent" type="color" value="${s.accent}"><label>Hintergrundfarbe</label><input id="bg" type="color" value="${s.bg}"><label>Kartenfarbe</label><input id="panel" type="color" value="${s.panel}"><label>Layout</label><select id="layout"><option value="comfortable" ${s.layout==='comfortable'?'selected':''}>Komfortabel</option><option value="compact" ${s.layout==='compact'?'selected':''}>Kompakt</option></select><label>Button-Stil</label><select id="buttonStyle"><option value="filled">Gefüllt</option><option value="outline" ${s.buttonStyle==='outline'?'selected':''}>Umrandet</option></select><button id="saveEditor">Design speichern</button></div><div class="card"><h2>Eigene Inhalte</h2>${field('Titel','ctitle')}<label>Text</label><textarea id="cbody" rows="3" placeholder="Dein eigener Infotext …"></textarea><label>In welchem Reiter anzeigen?</label><select id="cplace"><option value="home">Home</option><option value="training">Training</option><option value="profiles">Profile</option></select><button id="addCustom">Inhalt hinzufügen</button>${(s.custom||[]).map((x,i)=>`<div class="exercise row between"><div class="grow"><b>${esc(x.title)}</b><small> · ${esc(x.place)}</small></div><button class="danger" data-deletecustom="${i}">Löschen</button></div>`).join('')}</div>`}
+function accountView(){return `<div class="card"><h2>Konto</h2><p>Angemeldet als ${esc(user.email)}</p><p>Deine Profile, Trainingsdaten und Editor-Einstellungen liegen in deinem geschützten Cloud-Workspace.</p><button id="export">Backup herunterladen</button><label class="btn secondary" for="importFile" style="display:inline-block;margin-top:10px">Backup wiederherstellen</label><input id="importFile" type="file" accept="application/json" class="hidden"><button class="secondary" id="logout">Abmelden</button></div><div class="card"><h2>Datenschutz</h2><p>Jedes Login sieht nur den eigenen Workspace. Die Datenbank wird durch Row Level Security geschützt. Teile niemals deinen Supabase-Secret- oder Service-Role-Key.</p></div>`}
+function wire(){
+ $('#auth')?.addEventListener('submit',async e=>{e.preventDefault();let {error}=await sb.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});$('#authmsg').textContent=error?.message||'Angemeldet …'});
+ $('#signup')?.addEventListener('click',async()=>{let {data,error}=await sb.auth.signUp({email:$('#email').value,password:$('#password').value});$('#authmsg').textContent=error?.message||(data.session?'Konto erstellt.':'Bitte E-Mail bestätigen und danach anmelden.')});
+ $('#createProfile')?.addEventListener('click',async()=>{let name=$('#pname').value.trim();if(!name)return alert('Bitte Namen eingeben.');await saveProfile({workspace_id:workspace.id,name,start_weight:num('pstart'),goal_weight:num('pgoal'),calories:num('pkcal'),protein:num('ppro'),plan:$('#pplan').value})});
+ document.querySelectorAll('[data-activate]').forEach(b=>b.onclick=()=>{activeProfile=profiles.find(p=>p.id===b.dataset.activate);render()});
+ $('#day')?.addEventListener('change',()=>$('#exerciseList').innerHTML=exerciseRows($('#day').value));
+ $('#addExercise')?.addEventListener('click',()=>{let d=$('#day').value;plans[activeProfile.plan][d].push('Neue Übung');$('#exerciseList').innerHTML=exerciseRows(d)});
+ $('#saveWorkout')?.addEventListener('click',async()=>{let rows=[...document.querySelectorAll('.exercise')].map(r=>({exercise:r.querySelector('.exname')?.value,sets:r.querySelector('.sets')?.value,reps:r.querySelector('.reps')?.value,weight:r.querySelector('.weight')?.value,done:r.querySelector('.done')?.value==='true'}));let {error}=await sb.from('workouts').insert({workspace_id:workspace.id,profile_id:activeProfile.id,day:$('#day').value,entries:rows});if(error)alert(error.message);else alert('Training gespeichert.')});
+ $('#saveEditor')?.addEventListener('click',async()=>{settings={...defaults,...settings,titles:{...settings.titles,home:$('#t_home').value,training:$('#t_training').value,profiles:$('#t_profiles').value,editor:$('#t_editor').value},accent:$('#accent').value,bg:$('#bg').value,panel:$('#panel').value,layout:$('#layout').value,buttonStyle:$('#buttonStyle').value};await saveSettings();render()});
+ $('#addCustom')?.addEventListener('click',async()=>{let title=$('#ctitle').value.trim();if(!title)return alert('Bitte Titel eingeben.');settings.custom=[...(settings.custom||[]),{title,body:$('#cbody').value,place:$('#cplace').value}];await saveSettings();render()});
+ document.querySelectorAll('[data-deletecustom]').forEach(b=>b.onclick=async()=>{settings.custom.splice(+b.dataset.deletecustom,1);await saveSettings();render()});
+ $('#logout')?.addEventListener('click',()=>sb.auth.signOut());
+ $('#export')?.addEventListener('click',backup);
+ $('#importFile')?.addEventListener('change',restore);
+ document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{tab=b.dataset.go;render()});
+}
+function num(id){let v=$('#'+id).value;return v===''?null:Number(v)}
+async function backup(){let [p,w,s]=await Promise.all([sb.from('profiles').select('*').eq('workspace_id',workspace.id),sb.from('workouts').select('*').eq('workspace_id',workspace.id),sb.from('app_settings').select('*').eq('workspace_id',workspace.id)]);if(p.error||w.error||s.error)return alert('Backup fehlgeschlagen.');let blob=new Blob([JSON.stringify({version:1,profiles:p.data,workouts:w.data,settings:s.data?.[0]?.settings||{}},null,2)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='logbook-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(a.href)}
+async function restore(e){let f=e.target.files[0];if(!f)return;try{let data=JSON.parse(await f.text());if(!confirm('Backup importieren? Vorhandene gleichnamige Daten werden nicht automatisch gelöscht.'))return;let rows=(data.profiles||[]).map(p=>({...p,workspace_id:workspace.id}));if(rows.length){let r=await sb.from('profiles').upsert(rows,{onConflict:'id'});if(r.error)throw r.error}let wr=(data.workouts||[]).map(w=>({...w,workspace_id:workspace.id}));if(wr.length){let r=await sb.from('workouts').upsert(wr,{onConflict:'id'});if(r.error)throw r.error}if(data.settings){let r=await sb.from('app_settings').upsert({workspace_id:workspace.id,settings:data.settings},{onConflict:'workspace_id'});if(r.error)throw r.error}alert('Backup vollständig importiert.');await loadWorkspace();render()}catch(err){alert('Importfehler: '+err.message)}}
+$('#tabs').addEventListener('click',e=>{let b=e.target.closest('button[data-tab]');if(!b)return;tab=b.dataset.tab;document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('active',x===b));render()});
+init();
+</script>
+</body></html>
+<script>if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(console.warn));</script>
