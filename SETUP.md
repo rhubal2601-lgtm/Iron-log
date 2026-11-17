@@ -34,3 +34,13 @@ Der Export lädt einen JSON-Backup herunter. Der aktuelle Import stellt Profile 
 
 ## Grenzen der Free-Version
 Supabase Free kann Projekte nach Inaktivität pausieren; Free-Projekte haben begrenzte Quoten. GitHub Pages hostet nur die App-Dateien. Siehe aktuelle Supabase Free Limits und Pausenregeln in der offiziellen Dokumentation.
+
+
+## Neuer Trainingsbereich (Version 2)
+
+- Einseitige Übungen: In jeder Übung lässt sich "Einseitig" aktivieren. Links und rechts werden Gewicht und Wiederholungen getrennt protokolliert.
+- Gerätebibliothek: Enthält beispielhafte Geräte-/Gerätefamilien von Prime Fitness, Cybex, Hammer Strength, Nautilus, Technogym, Life Fitness, Matrix, Panatta, gym80, Precor und Freemotion sowie einen Eintrag für eigene Geräte. Die Bibliothek ist eine erweiterbare Startauswahl, keine vollständige Hersteller- oder Modell-Datenbank.
+- Geräteeinstellungen: Sitzhöhe, Polster, Arm-/Griffposition, Startposition und weitere passende Felder lassen sich je Gerät und Personenprofil speichern. Die Werte liegen im bestehenden JSON-Feld der Tabelle `app_settings`; für diese Erweiterung ist keine zusätzliche SQL-Migration nötig.
+- Übungszuordnung: Bei jeder Übung kann ein Gerät aus der Bibliothek zugeordnet werden.
+
+Nach dem Ersetzen der Dateien auf GitHub Pages bitte die Seite einmal vollständig neu laden. Falls eine alte Version angezeigt wird, Browser-Cache bzw. installierte PWA schließen und erneut öffnen.
